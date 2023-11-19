@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 from openai import OpenAI
 
@@ -6,7 +7,9 @@ client = OpenAI()
 messages = [{"role": "system", "content": "You are a helpful assistant."}]
 
 
-def main_note(filepath):
+def main_note(filepath, history):
+    if not filepath:
+        return history
     print(filepath)
     audio_file = open(filepath, "rb")
     transcript = client.audio.transcriptions.create(model="whisper-1", file=audio_file)
@@ -24,7 +27,7 @@ def main_note(filepath):
 
     output_text = output_message.content
     print(output_text)
-    speech_file_path = "/tmp/speech.mp3"
+    speech_file_path = "/tmp/speech.wav"
     response = client.audio.speech.create(
         model="tts-1",
         voice="alloy",
@@ -32,14 +35,23 @@ def main_note(filepath):
     )
 
     response.stream_to_file(speech_file_path)
-    return speech_file_path
+
+    os.rename(filepath, filepath + ".wav")
+    os.rename(speech_file_path, speech_file_path + ".wav")
+    history.append(((filepath + ".wav",), (speech_file_path + ".wav",)))
+    return history
 
 
-demo = gr.Interface(
-    fn=main_note,
-    inputs=gr.Audio(sources=["microphone"], type="filepath", format="mp3"),
-    outputs="audio",
-)
+# def get_chatbot_response(x, history):
+#     l = [(x, x)]
+#     history += l
+#     return history
 
-if __name__ == "__main__":
-    demo.launch(share=True)
+with gr.Blocks() as demo:
+    chatbot = gr.Chatbot()
+
+    mic = gr.Audio(sources=["microphone"], type="filepath")
+    mic.change(main_note, [mic, chatbot], chatbot)
+
+
+demo.launch(share=True)
