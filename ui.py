@@ -10,7 +10,15 @@ with open("config.toml", "rb") as f:
     config = tomllib.load(f)
 
 messages = [{"role": "system", "content": config["system-prompt"]}]
+text_display = []
 
+def get_completion(prompt, model="gpt-3.5-turbo"):
+    messages.append({"role": "user", "content": prompt})
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    return response.choices[0].message
 
 def main_note(filepath, history):
     if not filepath:
@@ -21,13 +29,11 @@ def main_note(filepath, history):
 
     user_input = transcript.text
     print(user_input)
+    text_display.append(user_input)
 
-    messages.append({"role": "user", "content": user_input})
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-    )
-    output_message = response.choices[0].message
+    # GPT生成回答
+    output_message = get_completion(user_input)
+
     messages.append(output_message)
 
     output_text = output_message.content
@@ -42,16 +48,17 @@ def main_note(filepath, history):
     response.stream_to_file(speech_file_path)
 
     # Ref: https://github.com/gradio-app/gradio/issues/2768#issuecomment-1497976532
-    os.rename(filepath, filepath + ".wav")
-    os.rename(speech_file_path, speech_file_path + ".wav")
-    history.append(((filepath + ".wav",), (speech_file_path + ".wav",)))
-    return history
+    history.append(((filepath,), (speech_file_path,)))
+
+    text_display.append(output_text)
+    return history, "\n".join(text_display)
+
 
 with gr.Blocks() as demo:
     chatbot = gr.Chatbot()
-
     mic = gr.Audio(sources=["microphone"], type="filepath")
-    mic.change(main_note, [mic, chatbot], chatbot)
+    text = gr.Textbox()
+    mic.change(main_note, [mic, chatbot], [chatbot, text])
 
 
 demo.launch(share=True)
