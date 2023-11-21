@@ -4,7 +4,12 @@ from openai import OpenAI
 
 client = OpenAI()
 
-messages = [{"role": "system", "content": "You are a helpful assistant."}]
+import tomllib
+
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+
+messages = [{"role": "system", "content": config["system-prompt"]}]
 
 
 def main_note(filepath, history):
@@ -36,16 +41,11 @@ def main_note(filepath, history):
 
     response.stream_to_file(speech_file_path)
 
+    # Ref: https://github.com/gradio-app/gradio/issues/2768#issuecomment-1497976532
     os.rename(filepath, filepath + ".wav")
     os.rename(speech_file_path, speech_file_path + ".wav")
     history.append(((filepath + ".wav",), (speech_file_path + ".wav",)))
     return history
-
-
-# def get_chatbot_response(x, history):
-#     l = [(x, x)]
-#     history += l
-#     return history
 
 with gr.Blocks() as demo:
     chatbot = gr.Chatbot()
